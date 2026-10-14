@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Текстовый редактор — Word</title>
+  <script src="https://cdn.jsdelivr.net/npm/docx@9.5.1/build/index.umd.js"></script>
+  <style>
+    :root { --bg:#eef1f5; --panel:#fff; --line:#d9dee7; --ink:#202733; --muted:#6e7785; --blue:#2563eb; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:var(--bg); font:14px Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    .app { min-height:100vh; display:flex; flex-direction:column; }
+    header { height:60px; background:#172033; color:white; display:flex; align-items:center; padding:0 22px; gap:16px; }
+    .brand { font-size:18px; font-weight:700; letter-spacing:.1px; white-space:nowrap; }
+    .file-name { background:transparent; color:#dce5f7; border:1px solid transparent; border-radius:6px; padding:7px 9px; width:240px; font-size:14px; }
+    .file-name:focus { border-color:#8192b4; outline:none; background:#202d45; }
+    .top-actions { margin-left:auto; display:flex; gap:8px; align-items:center; }
+    button, select, input { font:inherit; }
+    button { border:1px solid var(--line); background:white; color:var(--ink); border-radius:6px; min-height:34px; padding:0 11px; cursor:pointer; }
+    button:hover { background:#f3f6fa; }
+    button.primary { background:var(--blue); border-color:var(--blue); color:white; font-weight:600; }
+    button.primary:hover { background:#1d4ed8; }
+    .workspace { display:flex; min-height:calc(100vh - 60px); }
+    .sidebar { width:270px; background:var(--panel); border-right:1px solid var(--line); padding:18px 16px; overflow:auto; }
+    .section { border-bottom:1px solid #edf0f4; padding-bottom:17px; margin-bottom:17px; }
+    .section h3 { margin:0 0 12px; font-size:12px; text-transform:uppercase; color:var(--muted); letter-spacing:.07em; }
+    .field { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:9px 0; }
+    .field label { color:#515b69; }
+    .field select, .field input[type=number] { width:112px; height:32px; border:1px solid var(--line); border-radius:5px; padding:0 7px; background:white; }
+    .hint { color:var(--muted); font-size:12px; line-height:1.45; }
+    .main { flex:1; min-width:0; display:flex; flex-direction:column; }
+    .toolbar { min-height:52px; padding:9px 14px; background:white; border-bottom:1px solid var(--line); display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+    .toolbar select { height:34px; border:1px solid var(--line); border-radius:5px; padding:0 8px; }
+    .toolbar .font-family { width:145px; } .toolbar .font-size { width:75px; }
+    .tool { min-width:34px; padding:0 9px; font-weight:600; }
+    .tool.active { background:#dbeafe; border-color:#93c5fd; color:#1d4ed8; }
+    .divider { width:1px; height:26px; background:var(--line); margin:0 3px; }
+    .canvas { flex:1; overflow:auto; padding:35px 20px 70px; }
+    .page { width:min(850px, 100%); min-height:1080px; margin:0 auto; background:#fff; box-shadow:0 3px 18px #27344a1f; padding:96px 92px; }
+    #editor { min-height:880px; outline:none; font-family:Arial, sans-serif; font-size:12pt; line-height:1.45; color:#1f2937; }
+    #editor p { margin:0 0 10px; } #editor h1,#editor h2,#editor h3 { margin:18px 0 10px; }
+    #editor:empty:before { content:attr(data-placeholder); color:#9aa4b2; pointer-events:none; }
+    .statusbar { height:30px; background:white; border-top:1px solid var(--line); color:var(--muted); display:flex; align-items:center; padding:0 16px; gap:18px; font-size:12px; }
+    .saved { color:#16803c; }
+    @media(max-width:800px) { .sidebar { display:none; } .page { padding:48px 35px; } .file-name { width:145px; } .brand { display:none; } }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">Документ</div>
+    <input id="fileName" class="file-name" value="Новый документ" aria-label="Название файла" />
+    <div class="top-actions">
+      <button id="newBtn">Новый</button>
+      <button id="saveBtn" class="primary">Сохранить в Word</button>
+    </div>
+  </header>
+  <div class="workspace">
+    <aside class="sidebar">
+      <div class="section">
+        <h3>Страница</h3>
+        <div class="field"><label for="paper">Формат</label><select id="paper"><option value="A4">A4</option><option value="LETTER">Letter</option></select></div>
+        <div class="field"><label for="marginTop">Сверху, мм</label><input id="marginTop" type="number" min="0" max="100" value="25"></div>
+        <div class="field"><label for="marginRight">Справа, мм</label><input id="marginRight" type="number" min="0" max="100" value="20"></div>
+        <div class="field"><label for="marginBottom">Снизу, мм</label><input id="marginBottom" type="number" min="0" max="100" value="25"></div>
+        <div class="field"><label for="marginLeft">Слева, мм</label><input id="marginLeft" type="number" min="0" max="100" value="20"></div>
+        <p class="hint">Поля применяются к странице и сохраняются в Word-документе.</p>
+      </div>
+      <div class="section">
+        <h3>Абзац</h3>
+        <div class="field"><label for="lineSpacing">Интервал</label><select id="lineSpacing"><option value="1">Одинарный</option><option value="1.15">1,15</option><option value="1.5">Полуторный</option><option value="2">Двойной</option></select></div>
+        <div class="field"><label for="afterSpacing">После, пт</label><input id="afterSpacing" type="number" min="0" max="100" value="8"></div>
+        <div style="display:flex;gap:7px;margin-top:12px"><button class="tool" data-cmd="justifyLeft" title="По левому краю">≡◀</button><button class="tool" data-cmd="justifyCenter" title="По центру">≡</button><button class="tool" data-cmd="justifyRight" title="По правому краю">▶≡</button><button class="tool" data-cmd="justifyFull" title="По ширине">☰</button></div>
+      </div>
+      <div class="section">
+        <h3>Автосохранение</h3>
+        <p class="hint">Черновик автоматически хранится в браузере. Кнопка «Сохранить в Word» скачивает редактируемый файл .docx.</p>
+      </div>
+    </aside>
+    <main class="main">
+      <div class="toolbar" aria-label="Панель форматирования">
+        <select class="font-family" id="fontFamily" title="Шрифт"><option>Arial</option><option>Times New Roman</option><option>Calibri</option><option>Georgia</option><option>Verdana</option><option>Courier New</option></select>
+        <select class="font-size" id="fontSize" title="Размер"><option value="8">8</option><option value="10">10</option><option value="11">11</option><option value="12" selected>12</option><option value="14">14</option><option value="16">16</option><option value="18">18</option><option value="20">20</option><option value="24">24</option><option value="28">28</option><option value="36">36</option><option value="48">48</option></select>
+        <span class="divider"></span>
+        <button class="tool" data-cmd="bold" title="Жирный"><b>B</b></button><button class="tool" data-cmd="italic" title="Курсив"><i>I</i></button><button class="tool" data-cmd="underline" title="Подчёркивание"><u>U</u></button>
+        <span class="divider"></span>
+        <button class="tool" data-cmd="insertUnorderedList" title="Маркированный список">•≡</button><button class="tool" data-cmd="insertOrderedList" title="Нумерованный список">1≡</button><button class="tool" data-cmd="outdent" title="Уменьшить отступ">⇤</button><button class="tool" data-cmd="indent" title="Увеличить отступ">⇥</button>
+        <span class="divider"></span><button class="tool" data-cmd="removeFormat" title="Очистить форматирование">Tx</button>
+      </div>
+      <div class="canvas"><article class="page"><div id="editor" contenteditable="true" spellcheck="true" data-placeholder="Начните вводить текст…"><p><br></p></div></article></div>
+      <div class="statusbar"><span id="wordCount">0 слов</span><span id="charCount">0 знаков</span><span id="saveState" class="saved">Готово</span></div>
+    </main>
+  </div>
+</div>
+<script>
+(() => {
+  const editor = document.getElementById('editor'), state = document.getElementById('saveState');
+  const $ = id => document.getElementById(id);
+  let savedRange = null;
+  const settings = ['paper','marginTop','marginRight','marginBottom','marginLeft','lineSpacing','afterSpacing'];
+  function selectionSave(){ const s=getSelection(); if(s && s.rangeCount && editor.contains(s.anchorNode)){ savedRange=s.getRangeAt(0).cloneRange(); } }
+  function restore(){ if(savedRange){ const s=getSelection(); s.removeAllRanges(); s.addRange(savedRange); } editor.focus(); }
+  function cmd(command, value=null){ restore(); document.execCommand(command,false,value); update(); selectionSave(); }
+  document.querySelectorAll('[data-cmd]').forEach(b=>b.addEventListener('mousedown',e=>e.preventDefault()));
+  document.querySelectorAll('[data-cmd]').forEach(b=>b.addEventListener('click',()=>cmd(b.dataset.cmd)));
+  $('fontFamily').addEventListener('change', e=>cmd('fontName',e.target.value));
+  $('fontSize').addEventListener('change', e=>{ restore(); document.execCommand('fontSize',false,'7'); editor.querySelectorAll('font[size="7"]').forEach(n=>{n.removeAttribute('size');n.style.fontSize=e.target.value+'pt';}); update(); });
+  ['lineSpacing','afterSpacing'].forEach(id=>$(id).addEventListener('change',()=>{ restore(); const el=closestBlock(getSelection().anchorNode); if(el){ if(id==='lineSpacing') el.style.lineHeight=$(id).value; else el.style.marginBottom=$(id).value+'pt'; } update(); }));
+  function closestBlock(n){ while(n && n!==editor){ if(n.nodeType===1 && /^(P|DIV|H1|H2|H3|LI)$/.test(n.tagName)) return n; n=n.parentNode;} return null; }
+  editor.addEventListener('input', update); editor.addEventListener('keyup',selectionSave); editor.addEventListener('mouseup',selectionSave); editor.addEventListener('focus',selectionSave);
+  function update(){ const text=editor.innerText.replace(/\s+/g,' ').trim(); $('wordCount').textContent=(text?text.split(' ').length:0)+' слов'; $('charCount').textContent=text.length+' знаков'; state.textContent='Сохранено в браузере'; localStorage.setItem('text-editor-content',editor.innerHTML); localStorage.setItem('text-editor-name',$('fileName').value); localStorage.setItem('text-editor-settings',JSON.stringify(Object.fromEntries(settings.map(x=>[x,$(x).value])))); }
+  function load(){ const c=localStorage.getItem('text-editor-content'); if(c) editor.innerHTML=c; const n=localStorage.getItem('text-editor-name'); if(n) $('fileName').value=n; try{ const s=JSON.parse(localStorage.getItem('text-editor-settings')||'{}'); settings.forEach(x=>{if(s[x]!=null) $(x).value=s[x];}); }catch(e){} update(); applyPage(); }
+  function applyPage(){ const mm=id=>Number($(id).value||0)*3.7795; document.querySelector('.page').style.padding=`${mm('marginTop')}px ${mm('marginRight')}px ${mm('marginBottom')}px ${mm('marginLeft')}px`; }
+  settings.forEach(id=>$(id).addEventListener('change',()=>{applyPage();update();})); $('fileName').addEventListener('input',update);
+  $('newBtn').addEventListener('click',()=>{ if(confirm('Создать новый документ? Несохранённый текст будет заменён.')){ editor.innerHTML='<p><br></p>'; $('fileName').value='Новый документ'; update(); }});
+
+  function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function runFromNode(node, inherited={}){
+    if(node.nodeType===3) return [{text:node.nodeValue, ...inherited}];
+    if(node.nodeType!==1) return [];
+    const st=getComputedStyle(node), next={...inherited};
+    if(node.tagName==='B'||node.tagName==='STRONG'||st.fontWeight==='700') next.bold=true;
+    if(node.tagName==='I'||node.tagName==='EM'||st.fontStyle==='italic') next.italics=true;
+    if(node.tagName==='U'||st.textDecorationLine.includes('underline')) next.underline={};
+    if(st.fontFamily) next.font=st.fontFamily.split(',')[0].replace(/["']/g,'').trim();
+    if(st.fontSize) next.size=Math.max(8,Math.round(parseFloat(st.fontSize)*72/96*2));
+    return [...node.childNodes].flatMap(n=>runFromNode(n,next));
+  }
+  function paragraphFrom(el){
+    const d=window.docx; const st=getComputedStyle(el); const runs=runFromNode(el).filter(r=>r.text);
+    const children=runs.length ? runs.map(r=>new d.TextRun({text:r.text,font:r.font||'Arial',size:r.size||24,bold:r.bold,italics:r.italics,underline:r.underline})) : [new d.TextRun('')];
+    const align=st.textAlign==='center'?d.AlignmentType.CENTER:st.textAlign==='right'?d.AlignmentType.RIGHT:st.textAlign==='justify'?d.AlignmentType.JUSTIFIED:d.AlignmentType.LEFT;
+    const spacing={after:Math.round(parseFloat(st.marginBottom||'8')||8)*20,line:Math.round(parseFloat(st.lineHeight)*240)||240,lineRule:d.LineRuleType.AUTO};
+    return new d.Paragraph({children,alignment:align,spacing,style:el.tagName==='H1'?'Heading1':el.tagName==='H2'?'Heading2':el.tagName==='H3'?'Heading3':undefined});
+  }
+  function collectParagraphs(root){ const out=[]; [...root.children].forEach(el=>{ if(/^(P|H1|H2|H3|LI)$/.test(el.tagName)) out.push(paragraphFrom(el)); else if(el.tagName==='UL'||el.tagName==='OL') [...el.children].forEach(li=>{const p=paragraphFrom(li); p.numbering={reference:el.tagName==='UL'?'bullet-list':'number-list',level:0}; out.push(p);}); else out.push(...collectParagraphs(el)); }); return out.length?out:[new window.docx.Paragraph('')]; }
+  $('saveBtn').addEventListener('click', async()=>{
+    if(!window.docx){ alert('Библиотека Word ещё загружается. Проверьте интернет и попробуйте снова.'); return; }
+    const d=window.docx; const m=id=>Math.round(Number($(id).value||0)*56.6929); const children=collectParagraphs(editor);
+    const doc=new d.Document({sections:[{properties:{page:{size:$( 'paper').value==='LETTER'?{width:12240,height:15840}:{width:11906,height:16838},margin:{top:m('marginTop'),right:m('marginRight'),bottom:m('marginBottom'),left:m('marginLeft')}}},children}]});
+    const blob=await d.Packer.toBlob(doc); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=(($('fileName').value.trim()||'Новый документ').replace(/\.docx$/i,''))+'.docx'; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); state.textContent='Файл Word скачан';
+  });
+  load();
+})();
+</script>
+</body>
+</html>
